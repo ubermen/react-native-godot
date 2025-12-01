@@ -6,7 +6,7 @@ import {
   runOnGodotThread,
 } from '@borndotcom/react-native-godot';
 import * as FileSystem from 'expo-file-system/legacy';
-import {StyleSheet, View, Platform} from 'react-native';
+import {StyleSheet, View, Platform, Text} from 'react-native';
 import * as Device from 'expo-device';
 
 function initGodot(name: string) {
@@ -59,20 +59,48 @@ function initGodot(name: string) {
 
       RTNGodot.createInstance(args);
     }
+
+    let Godot = RTNGodot.API();
+    var engine = Godot.Engine;
+    var sceneTree = engine.get_main_loop();
+    var root = sceneTree.get_root();
+
+    connectLog(root);
+    connectSignal(root);
+  });
+}
+
+function connectLog(root: any) {
+  'worklet';
+  const vars = root.find_child('Vars', true, false);
+  vars.log.connect(function (text: String, color: String) {
+    console.log(text);
+  });
+}
+
+function connectSignal(root: any) {
+  'worklet';
+  const sigs = root.find_child('Sigs', true, false);
+  sigs.open_guide_requested.connect(function () {
+    console.log('open_guide_requested');
+  });
+  sigs.close_guide_requested.connect(function () {
+    console.log('close_guide_requested');
   });
 }
 
 const App = () => {
-  // ⭐ 앱 시작 시 곧바로 initGodot 실행
   useEffect(() => {
-    console.log('Auto-starting Godot…');
     initGodot('Minisia');
   }, []);
 
   return (
     <View style={styles.fullscreen}>
-      {/* ⭐ 화면 전체를 GodotView로 채움 */}
       <RTNGodotView style={styles.fullscreen} />
+
+      <View style={{position: 'absolute', top: 50, left: 20}}>
+        <Text style={{fontSize: 20, color: 'white'}}>Hello World!</Text>
+      </View>
     </View>
   );
 };
