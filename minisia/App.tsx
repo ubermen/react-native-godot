@@ -11,6 +11,9 @@ import * as Device from 'expo-device';
 import {WebView} from 'react-native-webview';
 import {useRunOnJS} from 'react-native-worklets-core';
 
+const guideUrl =
+  'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
+
 /** ⭐ Godot 엔진 초기화 */
 function initGodot(
   name: string,
@@ -156,7 +159,7 @@ const App = () => {
           >
             <WebView
               source={{
-                uri: 'https://www.reddit.com/r/minisia/comments/1p9nkwu/welcome_to_minisia_start_here/',
+                uri: guideUrl,
               }}
               style={{flex: 1}}
             />
@@ -186,7 +189,7 @@ const styles = StyleSheet.create({
 
   webviewBox: {
     width: 580,
-    height: '100%',
+    height: '140%',
     backgroundColor: '#fff',
     borderRadius: 14,
     overflow: 'hidden',
