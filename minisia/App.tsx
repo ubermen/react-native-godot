@@ -6,7 +6,14 @@ import {
   runOnGodotThread,
 } from '@borndotcom/react-native-godot';
 import * as FileSystem from 'expo-file-system/legacy';
-import {StyleSheet, View, Platform, Text} from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+} from 'react-native';
 import * as Device from 'expo-device';
 import {WebView} from 'react-native-webview';
 import {useRunOnJS} from 'react-native-worklets-core';
@@ -14,6 +21,25 @@ import {useKeepAwake} from 'expo-keep-awake';
 
 const guideUrl =
   'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
+
+function withSigsNode(callback: (sigs: any) => void) {
+  runOnGodotThread(() => {
+    'worklet';
+
+    const Godot = RTNGodot.API();
+    const engine = Godot.Engine;
+    const sceneTree = engine.get_main_loop();
+    const root = sceneTree.get_root();
+    const sigs = root.find_child('Sigs', true, false);
+
+    if (!sigs) {
+      console.log('Sigs node not found');
+      return;
+    }
+
+    callback(sigs);
+  });
+}
 
 /** ⭐ Godot 엔진 초기화 */
 function initGodot(
@@ -23,7 +49,8 @@ function initGodot(
   goBackGuideRunOnJS: () => void,
   goHomeGuideRunOnJS: () => void,
   onLogOutRunOnJS: () => void,
-  onSignOutRunOnJS: () => void,
+  onSignOutRunOnJS: (from: String) => void,
+  onClientInitializedOnJS: (from: String) => void,
 ) {
   if (RTNGodot.getInstance() != null) {
     console.log('Godot already initialized.');
@@ -89,6 +116,7 @@ function initGodot(
       goHomeGuideRunOnJS,
       onLogOutRunOnJS,
       onSignOutRunOnJS,
+      onClientInitializedOnJS,
     );
   });
 }
@@ -113,7 +141,8 @@ function connectSignal(
   goBackGuideRunOnJS: () => void,
   goHomeGuideRunOnJS: () => void,
   onLogOutRunOnJS: () => void,
-  onSignOutRunOnJS: () => void,
+  onSignOutRunOnJS: (from: String) => void,
+  onClientInitializedOnJS: (from: String) => void,
 ) {
   'worklet';
   const sigs = root.find_child('Sigs', true, false);
@@ -147,15 +176,26 @@ function connectSignal(
     onLogOutRunOnJS && onLogOutRunOnJS();
   });
 
-  sigs.signout_requested.connect(function () {
+  sigs.signout_requested.connect(function (from: String) {
     console.log('signout_requested (worklet)');
-    onSignOutRunOnJS && onSignOutRunOnJS();
+    onSignOutRunOnJS && onSignOutRunOnJS(from);
+  });
+
+  sigs.client_initialized.connect(function (from: String) {
+    console.log('client_initialized (worklet)');
+    onClientInitializedOnJS && onClientInitializedOnJS(from);
   });
 }
 
 /** ⭐ React Component */
 const App = () => {
   useKeepAwake();
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
+
+  // ⭐ 추가
+  const [loginId, setLoginId] = useState('');
+  const [loginPw, setLoginPw] = useState('');
+
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const [webviewKey, setWebviewKey] = useState(0);
@@ -183,8 +223,25 @@ const App = () => {
     setWebviewKey(prev => prev + 1);
   };
 
-  const onLogOut = () => setIsGuideOpen(false);
-  const onSignOut = () => setIsGuideOpen(false);
+  const onLogOut = () => {
+    setIsGuideOpen(false);
+  };
+  const onSignOut = (from: String) => {
+    setIsGuideOpen(false);
+    if (from == 'lobby') {
+      setShowLoginPopup(true);
+    }
+  };
+  const onClientInitialized = (from: String) => {
+    console.log('onClientInitialized:', from);
+    setShowLoginPopup(true);
+  };
+  const signIn = (id: String, password: String) => {
+    withSigsNode(sigs => {
+      'worklet';
+      sigs.signin(id, password);
+    });
+  };
 
   const openGuideRunOnJS = useRunOnJS(openGuide, [setIsGuideOpen]);
   const closeGuideRunOnJS = useRunOnJS(closeGuide, [setIsGuideOpen]);
@@ -192,6 +249,7 @@ const App = () => {
   const goHomeGuideRunOnJS = useRunOnJS(goHomeGuide, []);
   const onLogOutRunOnJS = useRunOnJS(onLogOut, []);
   const onSignOutRunOnJS = useRunOnJS(onSignOut, []);
+  const onClientInitializedOnJS = useRunOnJS(onClientInitialized, []);
 
   useEffect(() => {
     initGodot(
@@ -202,6 +260,7 @@ const App = () => {
       goHomeGuideRunOnJS,
       onLogOutRunOnJS,
       onSignOutRunOnJS,
+      onClientInitializedOnJS,
     );
   }, [
     openGuideRunOnJS,
@@ -210,6 +269,7 @@ const App = () => {
     goHomeGuideRunOnJS,
     onLogOutRunOnJS,
     onSignOutRunOnJS,
+    onClientInitializedOnJS,
   ]);
 
   /** ⭐ WebViewOverlay 크기 기반 WebViewBox 실측 조정 */
@@ -256,12 +316,86 @@ const App = () => {
           />
         </View>
       </View>
+
+      {showLoginPopup && (
+        <View style={styles.loginPopup}>
+          <View
+            style={{
+              backgroundColor: '#fff',
+              padding: 20,
+              borderRadius: 10,
+              width: 280,
+            }}>
+            <Text style={{fontSize: 20, textAlign: 'center', marginBottom: 12}}>
+              Log In
+            </Text>
+
+            <TextInput
+              placeholder="ID"
+              style={styles.input}
+              value={loginId}
+              onChangeText={setLoginId}
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              placeholder="Password"
+              secureTextEntry
+              style={styles.input}
+              value={loginPw}
+              onChangeText={setLoginPw}
+              autoCapitalize="none"
+            />
+
+            {/* ⭐ 로그인 버튼 */}
+            <TouchableOpacity
+              style={styles.loginBtn}
+              onPress={() => {
+                signIn(loginId, loginPw);
+                setShowLoginPopup(false);
+                setLoginId('');
+                setLoginPw('');
+              }}>
+              <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
+                Log In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   fullscreen: {flex: 1},
+
+  loginPopup: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  input: {
+    width: 250,
+    height: 45,
+    backgroundColor: '#fff',
+    color: '#000',
+    marginVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  loginBtn: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    borderRadius: 6,
+    marginTop: 10,
+  },
 
   webviewOverlay: {
     position: 'absolute',
