@@ -10,6 +10,7 @@ import {StyleSheet, View, Platform, Text} from 'react-native';
 import * as Device from 'expo-device';
 import {WebView} from 'react-native-webview';
 import {useRunOnJS} from 'react-native-worklets-core';
+import {useKeepAwake} from 'expo-keep-awake';
 
 const guideUrl =
   'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
@@ -154,6 +155,7 @@ function connectSignal(
 
 /** ⭐ React Component */
 const App = () => {
+  useKeepAwake();
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const [webviewKey, setWebviewKey] = useState(0);
