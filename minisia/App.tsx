@@ -176,8 +176,8 @@ function connectSignal(
     onLogOutRunOnJS && onLogOutRunOnJS();
   });
 
-  sigs.signout_requested.connect(function (from: String) {
-    console.log('signout_requested (worklet)');
+  sigs.signout_completed.connect(function (from: String) {
+    console.log('signout_completed (worklet)');
     onSignOutRunOnJS && onSignOutRunOnJS(from);
   });
 
