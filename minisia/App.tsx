@@ -51,6 +51,8 @@ function initGodot(
   onLogOutRunOnJS: () => void,
   onSignOutRunOnJS: (from: String) => void,
   onClientInitializedOnJS: (from: String) => void,
+  onInputRequestedOnJS: (from: String) => void,
+  onInputReleasedOnJS: () => void,
 ) {
   if (RTNGodot.getInstance() != null) {
     console.log('Godot already initialized.');
@@ -117,6 +119,8 @@ function initGodot(
       onLogOutRunOnJS,
       onSignOutRunOnJS,
       onClientInitializedOnJS,
+      onInputRequestedOnJS,
+      onInputReleasedOnJS,
     );
   });
 }
@@ -143,6 +147,8 @@ function connectSignal(
   onLogOutRunOnJS: () => void,
   onSignOutRunOnJS: (from: String) => void,
   onClientInitializedOnJS: (from: String) => void,
+  onInputRequestedOnJS: (from: String) => void,
+  onInputReleasedOnJS: () => void,
 ) {
   'worklet';
   const sigs = root.find_child('Sigs', true, false);
@@ -185,6 +191,15 @@ function connectSignal(
     console.log('client_initialized (worklet)');
     onClientInitializedOnJS && onClientInitializedOnJS(from);
   });
+
+  sigs.input_requested.connect(function (from: String) {
+    console.log('input_requested (worklet)');
+    onInputRequestedOnJS && onInputRequestedOnJS(from);
+  });
+  sigs.input_released.connect(function (from: String) {
+    console.log('input_released (worklet)');
+    onInputReleasedOnJS && onInputReleasedOnJS();
+  });
 }
 
 /** ⭐ React Component */
@@ -209,6 +224,11 @@ const App = () => {
   const TARGET_W = 640;
   const TARGET_H = 360;
   const RATIO = TARGET_W / TARGET_H; // 1.777...
+
+  // ⭐ 숨겨진 TextInput용 상태
+  const [showKeyboard, setShowKeyboard] = useState(false);
+  const [keyboardValue, setKeyboardValue] = useState('');
+  const [keyboardTarget, setKeyboardTarget] = useState<String>('');
 
   const openGuide = () => setIsGuideOpen(true);
   const closeGuide = () => setIsGuideOpen(false);
@@ -243,6 +263,33 @@ const App = () => {
     });
   };
 
+  /** ⭐ Godot → RN input 요청 */
+  const onInputRequested = (from: String) => {
+    console.log('onInputRequested:', from);
+    setKeyboardTarget(from);
+    setKeyboardValue('');
+    setShowKeyboard(true); // → 숨겨진 TextInput이 자동으로 키보드 띄움
+  };
+  const onInputReleased = () => {
+    setShowKeyboard(false);
+  };
+
+  /** ⭐ RN → Godot input 전달 */
+  const sendInput = (to: String, text: String) => {
+    console.log('sendInput', to, ':', text);
+    withSigsNode(sigs => {
+      'worklet';
+      sigs.send_input(to, text, true);
+    });
+  };
+
+  useEffect(() => {
+    withSigsNode(sigs => {
+      'worklet';
+      sigs.send_input(keyboardTarget, keyboardValue, false);
+    });
+  }, [keyboardTarget, keyboardValue]);
+
   const openGuideRunOnJS = useRunOnJS(openGuide, [setIsGuideOpen]);
   const closeGuideRunOnJS = useRunOnJS(closeGuide, [setIsGuideOpen]);
   const goBackGuideRunOnJS = useRunOnJS(goBackGuide, []);
@@ -250,6 +297,8 @@ const App = () => {
   const onLogOutRunOnJS = useRunOnJS(onLogOut, []);
   const onSignOutRunOnJS = useRunOnJS(onSignOut, []);
   const onClientInitializedOnJS = useRunOnJS(onClientInitialized, []);
+  const onInputRequestedOnJS = useRunOnJS(onInputRequested, []);
+  const onInputReleasedOnJS = useRunOnJS(onInputReleased, []);
 
   useEffect(() => {
     initGodot(
@@ -261,6 +310,8 @@ const App = () => {
       onLogOutRunOnJS,
       onSignOutRunOnJS,
       onClientInitializedOnJS,
+      onInputRequestedOnJS,
+      onInputReleasedOnJS,
     );
   }, [
     openGuideRunOnJS,
@@ -270,6 +321,8 @@ const App = () => {
     onLogOutRunOnJS,
     onSignOutRunOnJS,
     onClientInitializedOnJS,
+    onInputRequestedOnJS,
+    onInputReleasedOnJS,
   ]);
 
   /** ⭐ WebViewOverlay 크기 기반 WebViewBox 실측 조정 */
@@ -365,6 +418,24 @@ const App = () => {
           </View>
         </View>
       )}
+
+      {showKeyboard && (
+        <TextInput
+          style={styles.hidden_input}
+          autoFocus={true}
+          value={keyboardValue}
+          onChangeText={setKeyboardValue}
+          autoCapitalize="none"
+          onSubmitEditing={() => {
+            sendInput(keyboardTarget, keyboardValue);
+            setShowKeyboard(false);
+          }}
+          onBlur={() => {
+            sendInput(keyboardTarget, keyboardValue);
+            setShowKeyboard(false);
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -397,6 +468,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 6,
     marginTop: 10,
+  },
+
+  hidden_input: {
+    position: 'absolute',
+    opacity: 0,
+    height: 0,
+    width: 0,
+    backgroundColor: '#fff',
+    color: '#000',
   },
 
   webviewOverlay: {
