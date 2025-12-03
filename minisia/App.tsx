@@ -336,6 +336,7 @@ const App = () => {
               value={loginId}
               onChangeText={setLoginId}
               autoCapitalize="none"
+              placeholderTextColor="#999"
             />
 
             <TextInput
@@ -345,6 +346,7 @@ const App = () => {
               value={loginPw}
               onChangeText={setLoginPw}
               autoCapitalize="none"
+              placeholderTextColor="#999"
             />
 
             {/* ⭐ 로그인 버튼 */}
