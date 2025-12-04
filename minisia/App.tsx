@@ -51,7 +51,7 @@ function initGodot(
   onLogOutRunOnJS: () => void,
   onSignOutRunOnJS: (from: String) => void,
   onClientInitializedOnJS: (from: String) => void,
-  onInputRequestedOnJS: (from: String) => void,
+  onInputRequestedOnJS: (from: String, maxLength: number) => void,
   onInputReleasedOnJS: () => void,
 ) {
   if (RTNGodot.getInstance() != null) {
@@ -147,7 +147,7 @@ function connectSignal(
   onLogOutRunOnJS: () => void,
   onSignOutRunOnJS: (from: String) => void,
   onClientInitializedOnJS: (from: String) => void,
-  onInputRequestedOnJS: (from: String) => void,
+  onInputRequestedOnJS: (from: String, maxLength: number) => void,
   onInputReleasedOnJS: () => void,
 ) {
   'worklet';
@@ -192,9 +192,9 @@ function connectSignal(
     onClientInitializedOnJS && onClientInitializedOnJS(from);
   });
 
-  sigs.input_requested.connect(function (from: String) {
+  sigs.input_requested.connect(function (from: String, maxLength: number) {
     console.log('input_requested (worklet)');
-    onInputRequestedOnJS && onInputRequestedOnJS(from);
+    onInputRequestedOnJS && onInputRequestedOnJS(from, maxLength);
   });
   sigs.input_released.connect(function (from: String) {
     console.log('input_released (worklet)');
@@ -229,6 +229,7 @@ const App = () => {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [keyboardValue, setKeyboardValue] = useState('');
   const [keyboardTarget, setKeyboardTarget] = useState<String>('');
+  const [keyboardMaxLength, setKeyboardMaxLength] = useState<number>(0);
 
   const openGuide = () => setIsGuideOpen(true);
   const closeGuide = () => setIsGuideOpen(false);
@@ -264,8 +265,9 @@ const App = () => {
   };
 
   /** ⭐ Godot → RN input 요청 */
-  const onInputRequested = (from: String) => {
-    console.log('onInputRequested:', from);
+  const onInputRequested = (from: String, maxLength: number) => {
+    console.log('onInputRequested:', from, '(', maxLength, ')');
+    setKeyboardMaxLength(maxLength);
     setKeyboardTarget(from);
     setKeyboardValue('');
     setShowKeyboard(true); // → 숨겨진 TextInput이 자동으로 키보드 띄움
@@ -421,8 +423,13 @@ const App = () => {
 
       {showKeyboard && (
         <TextInput
-          style={styles.hidden_input}
           autoFocus={true}
+          autoCorrect={false}
+          multiline={false}
+          maxLength={keyboardMaxLength}
+          textBreakStrategy="simple"
+          underlineColorAndroid="transparent"
+          style={styles.hidden_input}
           value={keyboardValue}
           onChangeText={setKeyboardValue}
           autoCapitalize="none"
