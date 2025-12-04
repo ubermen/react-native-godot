@@ -423,6 +423,7 @@ const App = () => {
 
       {showKeyboard && (
         <TextInput
+          disableFullscreenUI={true}
           autoFocus={true}
           autoCorrect={false}
           multiline={false}
