@@ -13,11 +13,14 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  NativeModules,
+  NativeEventEmitter,
 } from 'react-native';
 import * as Device from 'expo-device';
 import {WebView} from 'react-native-webview';
 import {useRunOnJS} from 'react-native-worklets-core';
 import {useKeepAwake} from 'expo-keep-awake';
+import DeviceInfo from 'react-native-device-info';
 
 const guideUrl =
   'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
@@ -285,6 +288,15 @@ const App = () => {
     });
   };
 
+  const sendBatteryLevel = () => {
+    DeviceInfo.getBatteryLevel().then(batteryLevel => {
+      withSigsNode(sigs => {
+        'worklet';
+        sigs.send_battery_level(batteryLevel);
+      });
+    });
+  };
+
   useEffect(() => {
     withSigsNode(sigs => {
       'worklet';
@@ -292,6 +304,27 @@ const App = () => {
     });
   }, [keyboardTarget, keyboardValue]);
 
+  useEffect(() => {
+    // 1) 최초 전달
+    sendBatteryLevel();
+    const deviceInfoEmitter = new NativeEventEmitter(
+      NativeModules.RNDeviceInfo,
+    );
+
+    var batteryListener = deviceInfoEmitter.addListener(
+      'RNDeviceInfo_batteryLevelDidChange',
+      level => {
+        withSigsNode(sigs => {
+          'worklet';
+          sigs.send_battery_level(level); // level: 0~1
+        });
+      },
+    );
+
+    return () => {
+      batteryListener.remove();
+    };
+  }, []);
   const openGuideRunOnJS = useRunOnJS(openGuide, [setIsGuideOpen]);
   const closeGuideRunOnJS = useRunOnJS(closeGuide, [setIsGuideOpen]);
   const goBackGuideRunOnJS = useRunOnJS(goBackGuide, []);
