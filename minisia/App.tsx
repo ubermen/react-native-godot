@@ -288,13 +288,22 @@ const App = () => {
     });
   };
 
-  const sendBatteryLevel = () => {
-    DeviceInfo.getBatteryLevel().then(batteryLevel => {
-      withSigsNode(sigs => {
-        'worklet';
-        sigs.send_battery_level(batteryLevel);
-      });
+  const sendPowerStateHelper = (powerState: any) => {
+    // powerState = {
+    //   batteryLevel: number (0~1),
+    //   batteryState: 'unplugged' | 'charging' | 'full' | 'unknown',
+    //   lowPowerMode: boolean
+    // }
+    const {batteryLevel, batteryState, lowPowerMode} = powerState;
+
+    withSigsNode(sigs => {
+      'worklet';
+      sigs.send_power_state(batteryLevel, batteryState, lowPowerMode);
     });
+  };
+
+  const sendPowerState = () => {
+    DeviceInfo.getPowerState().then(sendPowerStateHelper);
   };
 
   useEffect(() => {
@@ -306,19 +315,14 @@ const App = () => {
 
   useEffect(() => {
     // 1) 최초 전달
-    sendBatteryLevel();
+    sendPowerState();
     const deviceInfoEmitter = new NativeEventEmitter(
       NativeModules.RNDeviceInfo,
     );
 
     var batteryListener = deviceInfoEmitter.addListener(
-      'RNDeviceInfo_batteryLevelDidChange',
-      level => {
-        withSigsNode(sigs => {
-          'worklet';
-          sigs.send_battery_level(level); // level: 0~1
-        });
-      },
+      'RNDeviceInfo_powerStateDidChange',
+      sendPowerStateHelper,
     );
 
     return () => {
