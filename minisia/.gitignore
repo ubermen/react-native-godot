@@ -70,3 +70,6 @@ yarn-error.log
 # Godot project build folders
 **/.godot
 project
+
+# Firebase
+google-services.json

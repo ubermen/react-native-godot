@@ -1,4 +1,4 @@
-package com.minisia
+package com.pixi4g.minisia
 
 import android.app.Application
 import com.facebook.react.PackageList
