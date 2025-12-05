@@ -320,12 +320,22 @@ const App = () => {
       NativeModules.RNDeviceInfo,
     );
 
-    var batteryListener = deviceInfoEmitter.addListener(
+    var powerStateListener = deviceInfoEmitter.addListener(
       'RNDeviceInfo_powerStateDidChange',
       sendPowerStateHelper,
     );
+    var batteryListener = deviceInfoEmitter.addListener(
+      'RNDeviceInfo_batteryLevelDidChange',
+      level => {
+        withSigsNode(sigs => {
+          'worklet';
+          sigs.send_battery_level(level); // level: 0~1
+        });
+      },
+    );
 
     return () => {
+      powerStateListener.remove();
       batteryListener.remove();
     };
   }, []);
