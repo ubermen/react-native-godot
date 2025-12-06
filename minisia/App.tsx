@@ -1,220 +1,43 @@
 import 'setimmediate';
 import React, {useEffect, useState} from 'react';
-import {
-  RTNGodot,
-  RTNGodotView,
-  runOnGodotThread,
-} from '@borndotcom/react-native-godot';
-import * as FileSystem from 'expo-file-system/legacy';
+import {RTNGodotView} from '@borndotcom/react-native-godot';
 import {
   StyleSheet,
   View,
-  Platform,
   Text,
   TextInput,
   TouchableOpacity,
   NativeModules,
   NativeEventEmitter,
+  ActivityIndicator,
 } from 'react-native';
-import * as Device from 'expo-device';
 import {WebView} from 'react-native-webview';
-import {useRunOnJS} from 'react-native-worklets-core';
 import {useKeepAwake} from 'expo-keep-awake';
 import DeviceInfo from 'react-native-device-info';
+import auth, {FirebaseAuthTypes} from '@react-native-firebase/auth';
+import {useGodotBridge} from './components/Godot/useGodotBridge';
 
 const guideUrl =
   'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
 
-function withSigsNode(callback: (sigs: any) => void) {
-  runOnGodotThread(() => {
-    'worklet';
-
-    const Godot = RTNGodot.API();
-    const engine = Godot.Engine;
-    const sceneTree = engine.get_main_loop();
-    const root = sceneTree.get_root();
-    const sigs = root.find_child('Sigs', true, false);
-
-    if (!sigs) {
-      console.log('Sigs node not found');
-      return;
-    }
-
-    callback(sigs);
-  });
-}
-
-/** ⭐ Godot 엔진 초기화 */
-function initGodot(
-  name: string,
-  openGuideRunOnJS: () => void,
-  closeGuideRunOnJS: () => void,
-  goBackGuideRunOnJS: () => void,
-  goHomeGuideRunOnJS: () => void,
-  onLogOutRunOnJS: () => void,
-  onSignOutRunOnJS: (from: String) => void,
-  onClientInitializedOnJS: (from: String) => void,
-  onInputRequestedOnJS: (from: String, maxLength: number) => void,
-  onInputReleasedOnJS: () => void,
-) {
-  if (RTNGodot.getInstance() != null) {
-    console.log('Godot already initialized.');
-    return;
-  }
-
-  console.log('Initializing Godot');
-
-  runOnGodotThread(() => {
-    'worklet';
-
-    if (Platform.OS === 'android') {
-      RTNGodot.createInstance([
-        '--verbose',
-        '--path',
-        '/' + name,
-        '--rendering-driver',
-        'opengl3',
-        '--rendering-method',
-        'gl_compatibility',
-        '--display-driver',
-        'embedded',
-      ]);
-    } else {
-      let args = [
-        '--verbose',
-        '--main-pack',
-        FileSystem.bundleDirectory + name + '.pck',
-        '--display-driver',
-        'embedded',
-      ];
-
-      if (Device.isDevice) {
-        args.push(
-          '--rendering-driver',
-          'opengl3',
-          '--rendering-method',
-          'gl_compatibility',
-        );
-      } else {
-        args.push(
-          '--rendering-driver',
-          'metal',
-          '--rendering-method',
-          'mobile',
-        );
-      }
-
-      RTNGodot.createInstance(args);
-    }
-
-    const Godot = RTNGodot.API();
-    const engine = Godot.Engine;
-    const sceneTree = engine.get_main_loop();
-    const root = sceneTree.get_root();
-
-    connectLog(root);
-    connectSignal(
-      root,
-      openGuideRunOnJS,
-      closeGuideRunOnJS,
-      goBackGuideRunOnJS,
-      goHomeGuideRunOnJS,
-      onLogOutRunOnJS,
-      onSignOutRunOnJS,
-      onClientInitializedOnJS,
-      onInputRequestedOnJS,
-      onInputReleasedOnJS,
-    );
-  });
-}
-
-function connectLog(root: any) {
-  'worklet';
-  const vars = root.find_child('Vars', true, false);
-  if (!vars) {
-    console.log('Vars node not found');
-    return;
-  }
-
-  vars.log.connect(function (text: String, color: String) {
-    console.log(String(text));
-  });
-}
-
-function connectSignal(
-  root: any,
-  openGuideRunOnJS: () => void,
-  closeGuideRunOnJS: () => void,
-  goBackGuideRunOnJS: () => void,
-  goHomeGuideRunOnJS: () => void,
-  onLogOutRunOnJS: () => void,
-  onSignOutRunOnJS: (from: String) => void,
-  onClientInitializedOnJS: (from: String) => void,
-  onInputRequestedOnJS: (from: String, maxLength: number) => void,
-  onInputReleasedOnJS: () => void,
-) {
-  'worklet';
-  const sigs = root.find_child('Sigs', true, false);
-  if (!sigs) {
-    console.log('Sigs node not found');
-    return;
-  }
-
-  sigs.open_guide_requested.connect(function () {
-    console.log('open_guide_requested (worklet)');
-    openGuideRunOnJS && openGuideRunOnJS();
-  });
-
-  sigs.close_guide_requested.connect(function () {
-    console.log('close_guide_requested (worklet)');
-    closeGuideRunOnJS && closeGuideRunOnJS();
-  });
-
-  sigs.go_back_guide_requested.connect(function () {
-    console.log('go_back_guide_requested (worklet)');
-    goBackGuideRunOnJS && goBackGuideRunOnJS();
-  });
-
-  sigs.go_home_guide_requested.connect(function () {
-    console.log('go_home_guide_requested (worklet)');
-    goHomeGuideRunOnJS && goHomeGuideRunOnJS();
-  });
-
-  sigs.logout_requested.connect(function () {
-    console.log('logout_requested (worklet)');
-    onLogOutRunOnJS && onLogOutRunOnJS();
-  });
-
-  sigs.signout_completed.connect(function (from: String) {
-    console.log('signout_completed (worklet)');
-    onSignOutRunOnJS && onSignOutRunOnJS(from);
-  });
-
-  sigs.client_initialized.connect(function (from: String) {
-    console.log('client_initialized (worklet)');
-    onClientInitializedOnJS && onClientInitializedOnJS(from);
-  });
-
-  sigs.input_requested.connect(function (from: String, maxLength: number) {
-    console.log('input_requested (worklet)');
-    onInputRequestedOnJS && onInputRequestedOnJS(from, maxLength);
-  });
-  sigs.input_released.connect(function (from: String) {
-    console.log('input_released (worklet)');
-    onInputReleasedOnJS && onInputReleasedOnJS();
-  });
-}
-
 /** ⭐ React Component */
 const App = () => {
   useKeepAwake();
-  const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+  useEffect(() => {
+    auth().onAuthStateChanged(userState => {
+      setUser(userState);
 
-  // ⭐ 추가
-  const [loginId, setLoginId] = useState('');
-  const [loginPw, setLoginPw] = useState('');
+      if (loading) {
+        setLoading(false);
+      }
+    });
+  }, []);
 
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const openGuide = () => setIsGuideOpen(true);
+  const closeGuide = () => setIsGuideOpen(false);
 
   const [webviewKey, setWebviewKey] = useState(0);
   const webviewRef = React.useRef<WebView>(null);
@@ -231,17 +54,18 @@ const App = () => {
   // ⭐ 숨겨진 TextInput용 상태
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [keyboardValue, setKeyboardValue] = useState('');
-  const [keyboardTarget, setKeyboardTarget] = useState<String>('');
+  const [keyboardTarget, setKeyboardTarget] = useState<string>('');
   const [keyboardMaxLength, setKeyboardMaxLength] = useState<number>(0);
-
-  const openGuide = () => setIsGuideOpen(true);
-  const closeGuide = () => setIsGuideOpen(false);
 
   const goBackGuide = () => {
     if (webviewRef.current) {
       webviewRef.current.goBack();
     }
   };
+
+  // ⭐ 추가
+  const [loginId, setLoginId] = useState('');
+  const [loginPw, setLoginPw] = useState('');
 
   const goHomeGuide = () => {
     setWebviewKey(prev => prev + 1);
@@ -256,19 +80,15 @@ const App = () => {
       setShowLoginPopup(true);
     }
   };
-  const onClientInitialized = (from: String) => {
+
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
+  const onClientInitialized = (from: string) => {
     console.log('onClientInitialized:', from);
     setShowLoginPopup(true);
   };
-  const signIn = (id: String, password: String) => {
-    withSigsNode(sigs => {
-      'worklet';
-      sigs.signin(id, password);
-    });
-  };
 
   /** ⭐ Godot → RN input 요청 */
-  const onInputRequested = (from: String, maxLength: number) => {
+  const onInputRequested = (from: string, maxLength: number) => {
     console.log('onInputRequested:', from, '(', maxLength, ')');
     setKeyboardMaxLength(maxLength);
     setKeyboardTarget(from);
@@ -279,13 +99,71 @@ const App = () => {
     setShowKeyboard(false);
   };
 
+  const godot = useGodotBridge('Minisia', {
+    openGuide,
+    closeGuide,
+    goBackGuide,
+    goHomeGuide,
+    onLogOut,
+    onSignOut,
+    onClientInitialized,
+    onInputRequested,
+    onInputReleased,
+  });
+
+  /** ⭐ Firebase 로그인 → 성공 후 Godot 로그인 */
+  const handleLogin = async () => {
+    if (!loginId || !loginPw) return;
+
+    try {
+      console.log('Trying Firebase login...');
+
+      // Firebase 이메일 로그인
+      const result = await auth().signInWithEmailAndPassword(
+        loginId.trim(),
+        loginPw.trim(),
+      );
+
+      console.log('Firebase login success:', result.user.uid);
+
+      // Firebase 성공 → Godot 로그인 호출
+      godot.signIn(loginId, loginPw);
+
+      // UI 정리
+      setShowLoginPopup(false);
+      setLoginId('');
+      setLoginPw('');
+    } catch (e) {
+      console.log('Firebase login error:', e);
+      alert('로그인에 실패했습니다. 아이디/비밀번호를 확인해주세요.');
+    }
+  };
+  /** ⭐ Firebase Anonymous → 성공 시 Godot Guest 로그인 */
+  const handleGuestLogin = async () => {
+    try {
+      console.log('Trying Firebase guest login...');
+
+      const result = await auth().signInAnonymously();
+
+      console.log('Firebase guest login success:', result.user.uid);
+
+      const uid = String(result.user.uid); // ⭐ 반드시 원시값으로 복사
+
+      // ⭐ Godot로 게스트 로그인 신호 보내기
+      godot.signIn(uid, '');
+
+      setShowLoginPopup(false);
+      setLoginId('');
+      setLoginPw('');
+    } catch (e) {
+      console.log('Guest login error:', e);
+      alert('게스트 로그인에 실패했습니다.');
+    }
+  };
+
   /** ⭐ RN → Godot input 전달 */
-  const sendInput = (to: String, text: String) => {
-    console.log('sendInput', to, ':', text);
-    withSigsNode(sigs => {
-      'worklet';
-      sigs.send_input(to, text, true);
-    });
+  const sendInput = (to: string, text: string) => {
+    godot.sendInput(to, text, true);
   };
 
   const sendPowerStateHelper = (powerState: any) => {
@@ -295,11 +173,7 @@ const App = () => {
     //   lowPowerMode: boolean
     // }
     const {batteryLevel, batteryState, lowPowerMode} = powerState;
-
-    withSigsNode(sigs => {
-      'worklet';
-      sigs.send_power_state(batteryLevel, batteryState, lowPowerMode);
-    });
+    godot.sendPowerState(batteryLevel, batteryState, lowPowerMode);
   };
 
   const sendPowerState = () => {
@@ -307,10 +181,7 @@ const App = () => {
   };
 
   useEffect(() => {
-    withSigsNode(sigs => {
-      'worklet';
-      sigs.send_input(keyboardTarget, keyboardValue, false);
-    });
+    godot.sendInput(keyboardTarget, keyboardValue, false);
   }, [keyboardTarget, keyboardValue]);
 
   useEffect(() => {
@@ -327,10 +198,7 @@ const App = () => {
     var batteryListener = deviceInfoEmitter.addListener(
       'RNDeviceInfo_batteryLevelDidChange',
       level => {
-        withSigsNode(sigs => {
-          'worklet';
-          sigs.send_battery_level(level); // level: 0~1
-        });
+        godot.sendBatteryLevel(level);
       },
     );
 
@@ -339,40 +207,6 @@ const App = () => {
       batteryListener.remove();
     };
   }, []);
-  const openGuideRunOnJS = useRunOnJS(openGuide, [setIsGuideOpen]);
-  const closeGuideRunOnJS = useRunOnJS(closeGuide, [setIsGuideOpen]);
-  const goBackGuideRunOnJS = useRunOnJS(goBackGuide, []);
-  const goHomeGuideRunOnJS = useRunOnJS(goHomeGuide, []);
-  const onLogOutRunOnJS = useRunOnJS(onLogOut, []);
-  const onSignOutRunOnJS = useRunOnJS(onSignOut, []);
-  const onClientInitializedOnJS = useRunOnJS(onClientInitialized, []);
-  const onInputRequestedOnJS = useRunOnJS(onInputRequested, []);
-  const onInputReleasedOnJS = useRunOnJS(onInputReleased, []);
-
-  useEffect(() => {
-    initGodot(
-      'Minisia',
-      openGuideRunOnJS,
-      closeGuideRunOnJS,
-      goBackGuideRunOnJS,
-      goHomeGuideRunOnJS,
-      onLogOutRunOnJS,
-      onSignOutRunOnJS,
-      onClientInitializedOnJS,
-      onInputRequestedOnJS,
-      onInputReleasedOnJS,
-    );
-  }, [
-    openGuideRunOnJS,
-    closeGuideRunOnJS,
-    goBackGuideRunOnJS,
-    goHomeGuideRunOnJS,
-    onLogOutRunOnJS,
-    onSignOutRunOnJS,
-    onClientInitializedOnJS,
-    onInputRequestedOnJS,
-    onInputReleasedOnJS,
-  ]);
 
   /** ⭐ WebViewOverlay 크기 기반 WebViewBox 실측 조정 */
   const onOverlayLayout = e => {
@@ -452,16 +286,17 @@ const App = () => {
             />
 
             {/* ⭐ 로그인 버튼 */}
-            <TouchableOpacity
-              style={styles.loginBtn}
-              onPress={() => {
-                signIn(loginId, loginPw);
-                setShowLoginPopup(false);
-                setLoginId('');
-                setLoginPw('');
-              }}>
+            <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
               <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
                 Log In
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.loginBtn, {backgroundColor: '#555', marginTop: 6}]}
+              onPress={handleGuestLogin}>
+              <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
+                게스트로 시작하기
               </Text>
             </TouchableOpacity>
           </View>
@@ -490,6 +325,15 @@ const App = () => {
             setShowKeyboard(false);
           }}
         />
+      )}
+
+      {/* ⭐ 로딩 오버레이 */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        </View>
       )}
     </View>
   );
@@ -550,6 +394,26 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
   },
+
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingBox: {
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+  },
 });
 
 export default App;
+function alert(arg0: string) {
+  throw new Error('Function not implemented.');
+}
