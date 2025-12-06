@@ -16,6 +16,21 @@ import {useKeepAwake} from 'expo-keep-awake';
 import DeviceInfo from 'react-native-device-info';
 import auth, {FirebaseAuthTypes} from '@react-native-firebase/auth';
 import {useGodotBridge} from './components/Godot/useGodotBridge';
+import {GoogleSignin} from '@react-native-google-signin/google-signin';
+import googleServices from './android/app/google-services.json';
+
+const findWebClientId = () => {
+  for (const client of googleServices.client) {
+    if (!client.oauth_client) continue;
+
+    for (const oauth of client.oauth_client) {
+      if (oauth.client_type === 3) {
+        return oauth.client_id;
+      }
+    }
+  }
+  return null;
+};
 
 const guideUrl =
   'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
@@ -33,6 +48,14 @@ const App = () => {
         setLoading(false);
       }
     });
+
+    const webClientId = findWebClientId();
+
+    if (webClientId) {
+      GoogleSignin.configure({webClientId});
+    } else {
+      console.warn('Web client ID not found in google-services.json');
+    }
   }, []);
 
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -135,7 +158,6 @@ const App = () => {
       setLoginPw('');
     } catch (e) {
       console.log('Firebase login error:', e);
-      alert('로그인에 실패했습니다. 아이디/비밀번호를 확인해주세요.');
     }
   };
   /** ⭐ Firebase Anonymous → 성공 시 Godot Guest 로그인 */
@@ -157,7 +179,40 @@ const App = () => {
       setLoginPw('');
     } catch (e) {
       console.log('Guest login error:', e);
-      alert('게스트 로그인에 실패했습니다.');
+    }
+  };
+  const handleGoogleLogin = async () => {
+    try {
+      console.log('Trying Google login...');
+
+      // Google Play Services 체크
+      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
+
+      // 사용자 Google 선택 → idToken + userInfo 반환
+      const {data} = await GoogleSignin.signIn();
+
+      if (!data) {
+        return;
+      }
+
+      // Firebase Credential로 변환
+      const googleCredential = auth.GoogleAuthProvider.credential(data.idToken);
+
+      // Firebase Auth 로그인
+      const result = await auth().signInWithCredential(googleCredential);
+
+      console.log('Google Firebase login success:', result.user.uid);
+
+      // Godot 로그인
+      const uid = String(result.user.uid);
+      godot.signIn(uid, '');
+
+      // UI 정리
+      setShowLoginPopup(false);
+      setLoginId('');
+      setLoginPw('');
+    } catch (e) {
+      console.log('Google login error:', e);
     }
   };
 
@@ -209,7 +264,7 @@ const App = () => {
   }, []);
 
   /** ⭐ WebViewOverlay 크기 기반 WebViewBox 실측 조정 */
-  const onOverlayLayout = e => {
+  const onOverlayLayout = (e: any) => {
     const {width: screenW, height: screenH} = e.nativeEvent.layout;
 
     // 가로모드 기준: 위아래 꽉 채움 → height = screenH
@@ -297,6 +352,17 @@ const App = () => {
               onPress={handleGuestLogin}>
               <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
                 게스트로 시작하기
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.loginBtn,
+                {backgroundColor: '#DB4437', marginTop: 6},
+              ]}
+              onPress={handleGoogleLogin}>
+              <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
+                Continue with Google
               </Text>
             </TouchableOpacity>
           </View>
@@ -414,6 +480,3 @@ const styles = StyleSheet.create({
 });
 
 export default App;
-function alert(arg0: string) {
-  throw new Error('Function not implemented.');
-}
