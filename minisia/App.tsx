@@ -97,10 +97,27 @@ const App = () => {
   const onLogOut = () => {
     setIsGuideOpen(false);
   };
-  const onSignOut = (from: String) => {
+  const onSignOut = async (from: String) => {
     setIsGuideOpen(false);
+
     if (from == 'lobby') {
       setShowLoginPopup(true);
+
+      // 🔥 Firebase 인증 초기화
+      try {
+        await auth().signOut();
+      } catch (e) {
+        console.log('Firebase signOut error:', e);
+      }
+
+      // 🔥 Google 계정 초기화 → 다시 계정 선택 팝업 뜨게 함
+      try {
+        await GoogleSignin.revokeAccess(); // accessToken 강제 제거
+        await GoogleSignin.signOut(); // Google 계정 연결 끊기
+        console.log('Google signOut complete');
+      } catch (e) {
+        console.log('Google signOut error:', e);
+      }
     }
   };
 
@@ -351,7 +368,7 @@ const App = () => {
               style={[styles.loginBtn, {backgroundColor: '#555', marginTop: 6}]}
               onPress={handleGuestLogin}>
               <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
-                게스트로 시작하기
+                Continue as Guest
               </Text>
             </TouchableOpacity>
 
