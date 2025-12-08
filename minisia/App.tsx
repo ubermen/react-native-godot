@@ -4,264 +4,134 @@ import {RTNGodotView} from '@borndotcom/react-native-godot';
 import {
   StyleSheet,
   View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   NativeModules,
   NativeEventEmitter,
-  ActivityIndicator,
 } from 'react-native';
+
 import {useKeepAwake} from 'expo-keep-awake';
 import DeviceInfo from 'react-native-device-info';
-import auth, {FirebaseAuthTypes} from '@react-native-firebase/auth';
-import {useGodotBridge} from './components/Godot/useGodotBridge';
+
+import {useAuth} from './components/Auth/useAuth';
+import {LoginPopup} from './components/Auth/LoginPopup';
+
 import {
   WebGuideOverlay,
   WebGuideOverlayRef,
 } from './components/Godot/WebGuideOverlay';
-import {GoogleSignin} from '@react-native-google-signin/google-signin';
-import googleServices from './android/app/google-services.json';
 
-const findWebClientId = () => {
-  for (const client of googleServices.client) {
-    if (!client.oauth_client) continue;
-
-    for (const oauth of client.oauth_client) {
-      if (oauth.client_type === 3) {
-        return oauth.client_id;
-      }
-    }
-  }
-  return null;
-};
+import {useGodotBridge} from './components/Godot/useGodotBridge';
+import {HiddenKeyboardInput} from './components/Godot/HiddenKeyboardInput';
 
 const guideUrl =
   'https://minisian.blogspot.com/2025/12/welcome-to-minisia-start-here.html';
 
-/** ⭐ React Component */
 const App = () => {
   useKeepAwake();
-  const [loading, setLoading] = useState<boolean>(true);
-  const [initialized, setInitialized] = useState<boolean>(false);
-  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
 
-  useEffect(() => {
-    if (!initialized) return;
-    const userValid = user?.uid;
-    if (userValid) {
-      // 🟢 uid가 확실하게 존재할 때만 실행
-      const uid = String(user.uid);
-      godot.signIn(uid, '');
+  /** ⭐ Firebase Auth */
+  const {
+    user,
+    loading: authLoading,
+    loginWithEmail,
+    loginWithGoogle,
+    loginAsGuest,
+    logout,
+  } = useAuth();
 
-      // UI 정리
-      setLoginId('');
-      setLoginPw('');
-    }
+  /** ⭐ 게임 클라이언트 초기화 여부 */
+  const [initialized, setInitialized] = useState(false);
 
-    setShowLoginPopup(!userValid);
-    if (loading) setLoading(false);
-  }, [user, initialized]);
-
-  useEffect(() => {
-    auth().onAuthStateChanged(userState => {
-      setUser(userState);
-      console.log('onAuthStateChanged:', userState?.uid);
-    });
-
-    const webClientId = findWebClientId();
-
-    if (webClientId) {
-      GoogleSignin.configure({webClientId});
-    } else {
-      console.warn('Web client ID not found in google-services.json');
-    }
-  }, []);
-
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const openGuide = () => setIsGuideOpen(true);
-  const closeGuide = () => setIsGuideOpen(false);
-
-  const webGuideRef = useRef<WebGuideOverlayRef>(null);
-  const goBackGuide = () => {
-    webGuideRef.current?.goBack();
-  };
-  const goHomeGuide = () => {
-    webGuideRef.current?.goHome();
-  };
-
-  // ⭐ 숨겨진 TextInput용 상태
-  const [showKeyboard, setShowKeyboard] = useState(false);
-  const [keyboardValue, setKeyboardValue] = useState('');
-  const [keyboardTarget, setKeyboardTarget] = useState<string>('');
-  const [keyboardMaxLength, setKeyboardMaxLength] = useState<number>(0);
-
-  // ⭐ 추가
+  /** ⭐ 로그인 UI */
+  const [showLoginPopup, setShowLoginPopup] = useState(false);
   const [loginId, setLoginId] = useState('');
   const [loginPw, setLoginPw] = useState('');
 
-  const onLogOut = () => {
-    setIsGuideOpen(false);
-  };
-  const onSignOut = async (from: String) => {
-    setIsGuideOpen(false);
+  /** ⭐ WebGuide */
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const webGuideRef = useRef<WebGuideOverlayRef>(null);
 
-    if (from == 'lobby') {
-      setShowLoginPopup(true);
+  /** ⭐ Hidden keyboard */
+  const [showKeyboard, setShowKeyboard] = useState(false);
+  const [keyboardValue, setKeyboardValue] = useState('');
+  const [keyboardTarget, setKeyboardTarget] = useState('');
+  const [keyboardMaxLength, setKeyboardMaxLength] = useState(0);
 
-      // 🔥 Firebase 인증 초기화
-      try {
-        await auth().signOut();
-      } catch (e) {
-        console.log('Firebase signOut error:', e);
-      }
-
-      // 🔥 Google 계정 초기화 → 다시 계정 선택 팝업 뜨게 함
-      try {
-        await GoogleSignin.revokeAccess(); // accessToken 강제 제거
-        await GoogleSignin.signOut(); // Google 계정 연결 끊기
-        console.log('Google signOut complete');
-      } catch (e) {
-        console.log('Google signOut error:', e);
-      }
-    }
-  };
-
-  const [showLoginPopup, setShowLoginPopup] = useState(false);
-  const onClientInitialized = (from: string) => {
-    console.log('onClientInitialized:', from);
-    setInitialized(true);
-  };
-
-  /** ⭐ Godot → RN input 요청 */
-  const onInputRequested = (from: string, maxLength: number) => {
-    console.log('onInputRequested:', from, '(', maxLength, ')');
-    setKeyboardMaxLength(maxLength);
-    setKeyboardTarget(from);
-    setKeyboardValue('');
-    setShowKeyboard(true); // → 숨겨진 TextInput이 자동으로 키보드 띄움
-  };
-  const onInputReleased = () => {
-    setShowKeyboard(false);
-  };
-
+  /** ⭐ Godot Bridge */
   const godot = useGodotBridge('Minisia', {
-    openGuide,
-    closeGuide,
-    goBackGuide,
-    goHomeGuide,
-    onLogOut,
-    onSignOut,
-    onClientInitialized,
-    onInputRequested,
-    onInputReleased,
+    openGuide: () => setIsGuideOpen(true),
+    closeGuide: () => setIsGuideOpen(false),
+    goBackGuide: () => webGuideRef.current?.goBack(),
+    goHomeGuide: () => webGuideRef.current?.goHome(),
+    onLogOut: () => setIsGuideOpen(false),
+    onSignOut: async () => {
+      setIsGuideOpen(false);
+      await logout();
+      setShowLoginPopup(true);
+    },
+    onClientInitialized: () => setInitialized(true),
+    onInputRequested: (from, maxLen) => {
+      setKeyboardTarget(from);
+      setKeyboardValue('');
+      setKeyboardMaxLength(maxLen);
+      setShowKeyboard(true);
+    },
+    onInputReleased: () => setShowKeyboard(false),
   });
 
-  /** ⭐ Firebase 로그인 → 성공 후 Godot 로그인 */
-  const handleLogin = async () => {
-    if (!loginId || !loginPw) return;
+  /** ⭐ 인증 + 게임 초기화 → Godot 로그인 */
+  useEffect(() => {
+    if (!initialized) return; // Godot 준비X
+    if (!user?.uid) {
+      setShowLoginPopup(true);
+      return;
+    }
 
-    try {
-      console.log('Trying Firebase login...');
+    godot.signIn(user.uid, '');
+    setShowLoginPopup(false);
+    setLoginId('');
+    setLoginPw('');
+  }, [initialized, user]);
 
-      // Firebase 이메일 로그인
-      const result = await auth().signInWithEmailAndPassword(
-        loginId.trim(),
-        loginPw.trim(),
+  /** ⭐ PowerState Reporting */
+  useEffect(() => {
+    const sendPowerStateHelper = (state: any) => {
+      godot.sendPowerState(
+        state.batteryLevel,
+        state.batteryState,
+        state.lowPowerMode,
       );
+    };
 
-      console.log('Firebase login success:', result.user.uid);
-    } catch (e) {
-      console.log('Firebase login error:', e);
-    }
-  };
-  /** ⭐ Firebase Anonymous → 성공 시 Godot Guest 로그인 */
-  const handleGuestLogin = async () => {
-    try {
-      console.log('Trying Firebase guest login...');
-
-      const result = await auth().signInAnonymously();
-
-      console.log('Firebase guest login success:', result.user.uid);
-    } catch (e) {
-      console.log('Guest login error:', e);
-    }
-  };
-  const handleGoogleLogin = async () => {
-    try {
-      console.log('Trying Google login...');
-
-      // Google Play Services 체크
-      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
-
-      // 사용자 Google 선택 → idToken + userInfo 반환
-      const {data} = await GoogleSignin.signIn();
-
-      if (!data) {
-        return;
-      }
-
-      // Firebase Credential로 변환
-      const googleCredential = auth.GoogleAuthProvider.credential(data.idToken);
-
-      // Firebase Auth 로그인
-      const result = await auth().signInWithCredential(googleCredential);
-
-      console.log('Google Firebase login success:', result.user.uid);
-    } catch (e) {
-      console.log('Google login error:', e);
-    }
-  };
-
-  /** ⭐ RN → Godot input 전달 */
-  const sendInput = (to: string, text: string) => {
-    godot.sendInput(to, text, true);
-  };
-
-  const sendPowerStateHelper = (powerState: any) => {
-    // powerState = {
-    //   batteryLevel: number (0~1),
-    //   batteryState: 'unplugged' | 'charging' | 'full' | 'unknown',
-    //   lowPowerMode: boolean
-    // }
-    const {batteryLevel, batteryState, lowPowerMode} = powerState;
-    godot.sendPowerState(batteryLevel, batteryState, lowPowerMode);
-  };
-
-  const sendPowerState = () => {
     DeviceInfo.getPowerState().then(sendPowerStateHelper);
-  };
 
-  useEffect(() => {
-    godot.sendInput(keyboardTarget, keyboardValue, false);
-  }, [keyboardTarget, keyboardValue]);
+    const emitter = new NativeEventEmitter(NativeModules.RNDeviceInfo);
 
-  useEffect(() => {
-    // 1) 최초 전달
-    sendPowerState();
-    const deviceInfoEmitter = new NativeEventEmitter(
-      NativeModules.RNDeviceInfo,
-    );
-
-    var powerStateListener = deviceInfoEmitter.addListener(
+    const p1 = emitter.addListener(
       'RNDeviceInfo_powerStateDidChange',
       sendPowerStateHelper,
     );
-    var batteryListener = deviceInfoEmitter.addListener(
+    const p2 = emitter.addListener(
       'RNDeviceInfo_batteryLevelDidChange',
-      level => {
-        godot.sendBatteryLevel(level);
+      lvl => {
+        godot.sendBatteryLevel(lvl);
       },
     );
 
     return () => {
-      powerStateListener.remove();
-      batteryListener.remove();
+      p1.remove();
+      p2.remove();
     };
   }, []);
 
+  /** ⭐ Hidden keyboard 실시간 입력 전달 */
+  useEffect(() => {
+    if (!keyboardTarget) return;
+    godot.sendInput(keyboardTarget, keyboardValue, false);
+  }, [keyboardValue]);
+
   return (
-    <View style={styles.fullscreen}>
-      <RTNGodotView style={styles.fullscreen} />
+    <View style={styles.full}>
+      <RTNGodotView style={styles.full} />
 
       <WebGuideOverlay
         ref={webGuideRef}
@@ -270,156 +140,34 @@ const App = () => {
       />
 
       {showLoginPopup && (
-        <View style={styles.loginPopup}>
-          <View
-            style={{
-              backgroundColor: '#fff',
-              padding: 20,
-              borderRadius: 10,
-              width: 280,
-            }}>
-            <Text style={{fontSize: 20, textAlign: 'center', marginBottom: 12}}>
-              Log In
-            </Text>
-
-            <TextInput
-              placeholder="ID"
-              style={styles.input}
-              value={loginId}
-              onChangeText={setLoginId}
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-
-            <TextInput
-              placeholder="Password"
-              secureTextEntry
-              style={styles.input}
-              value={loginPw}
-              onChangeText={setLoginPw}
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-
-            {/* ⭐ 로그인 버튼 */}
-            <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-              <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
-                Log In
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.loginBtn, {backgroundColor: '#555', marginTop: 6}]}
-              onPress={handleGuestLogin}>
-              <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
-                Continue as Guest
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.loginBtn,
-                {backgroundColor: '#DB4437', marginTop: 6},
-              ]}
-              onPress={handleGoogleLogin}>
-              <Text style={{color: '#fff', fontSize: 16, textAlign: 'center'}}>
-                Continue with Google
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {showKeyboard && (
-        <TextInput
-          disableFullscreenUI={true}
-          autoFocus={true}
-          autoCorrect={false}
-          multiline={false}
-          maxLength={keyboardMaxLength}
-          textBreakStrategy="simple"
-          underlineColorAndroid="transparent"
-          style={styles.hidden_input}
-          value={keyboardValue}
-          onChangeText={setKeyboardValue}
-          autoCapitalize="none"
-          onSubmitEditing={() => {
-            sendInput(keyboardTarget, keyboardValue);
-            setShowKeyboard(false);
-          }}
-          onBlur={() => {
-            sendInput(keyboardTarget, keyboardValue);
-            setShowKeyboard(false);
-          }}
+        <LoginPopup
+          loginId={loginId}
+          loginPw={loginPw}
+          setLoginId={setLoginId}
+          setLoginPw={setLoginPw}
+          onLogin={() => loginWithEmail(loginId, loginPw)}
+          onGuest={loginAsGuest}
+          onGoogle={loginWithGoogle}
         />
       )}
 
-      {/* ⭐ 로딩 오버레이 */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        </View>
-      )}
+      <HiddenKeyboardInput
+        visible={showKeyboard}
+        value={keyboardValue}
+        maxLength={keyboardMaxLength}
+        onChange={setKeyboardValue}
+        onSubmit={() => {
+          godot.sendInput(keyboardTarget, keyboardValue, true);
+          setShowKeyboard(false);
+        }}
+        onBlur={() => setShowKeyboard(false)}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  fullscreen: {flex: 1},
-
-  loginPopup: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  input: {
-    width: 250,
-    height: 45,
-    backgroundColor: '#fff',
-    color: '#000',
-    marginVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  loginBtn: {
-    backgroundColor: '#007bff',
-    paddingVertical: 12,
-    borderRadius: 6,
-    marginTop: 10,
-  },
-
-  hidden_input: {
-    position: 'absolute',
-    opacity: 0,
-    height: 0,
-    width: 0,
-    backgroundColor: '#fff',
-    color: '#000',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  loadingBox: {
-    padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 12,
-  },
+  full: {flex: 1},
 });
 
 export default App;
