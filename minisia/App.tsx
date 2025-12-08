@@ -39,14 +39,30 @@ const guideUrl =
 const App = () => {
   useKeepAwake();
   const [loading, setLoading] = useState<boolean>(true);
+  const [initialized, setInitialized] = useState<boolean>(false);
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+
+  useEffect(() => {
+    if (!initialized) return;
+    const userValid = user?.uid;
+    if (userValid) {
+      // 🟢 uid가 확실하게 존재할 때만 실행
+      const uid = String(user.uid);
+      godot.signIn(uid, '');
+
+      // UI 정리
+      setLoginId('');
+      setLoginPw('');
+    }
+
+    setShowLoginPopup(!userValid);
+    if (loading) setLoading(false);
+  }, [user, initialized]);
+
   useEffect(() => {
     auth().onAuthStateChanged(userState => {
       setUser(userState);
-
-      if (loading) {
-        setLoading(false);
-      }
+      console.log('onAuthStateChanged:', userState?.uid);
     });
 
     const webClientId = findWebClientId();
@@ -124,7 +140,7 @@ const App = () => {
   const [showLoginPopup, setShowLoginPopup] = useState(false);
   const onClientInitialized = (from: string) => {
     console.log('onClientInitialized:', from);
-    setShowLoginPopup(true);
+    setInitialized(true);
   };
 
   /** ⭐ Godot → RN input 요청 */
@@ -165,14 +181,6 @@ const App = () => {
       );
 
       console.log('Firebase login success:', result.user.uid);
-
-      // Firebase 성공 → Godot 로그인 호출
-      godot.signIn(loginId, loginPw);
-
-      // UI 정리
-      setShowLoginPopup(false);
-      setLoginId('');
-      setLoginPw('');
     } catch (e) {
       console.log('Firebase login error:', e);
     }
@@ -185,15 +193,6 @@ const App = () => {
       const result = await auth().signInAnonymously();
 
       console.log('Firebase guest login success:', result.user.uid);
-
-      const uid = String(result.user.uid); // ⭐ 반드시 원시값으로 복사
-
-      // ⭐ Godot로 게스트 로그인 신호 보내기
-      godot.signIn(uid, '');
-
-      setShowLoginPopup(false);
-      setLoginId('');
-      setLoginPw('');
     } catch (e) {
       console.log('Guest login error:', e);
     }
@@ -219,15 +218,6 @@ const App = () => {
       const result = await auth().signInWithCredential(googleCredential);
 
       console.log('Google Firebase login success:', result.user.uid);
-
-      // Godot 로그인
-      const uid = String(result.user.uid);
-      godot.signIn(uid, '');
-
-      // UI 정리
-      setShowLoginPopup(false);
-      setLoginId('');
-      setLoginPw('');
     } catch (e) {
       console.log('Google login error:', e);
     }
