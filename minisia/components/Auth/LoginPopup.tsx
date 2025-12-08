@@ -13,6 +13,7 @@ export const LoginPopup = ({
   setLoginId,
   setLoginPw,
   onLogin,
+  onRegister, // ⭐ 회원가입 추가
   onGuest,
   onGoogle,
 }: {
@@ -21,6 +22,7 @@ export const LoginPopup = ({
   setLoginId: (v: string) => void;
   setLoginPw: (v: string) => void;
   onLogin: () => void;
+  onRegister: () => void; // ⭐ 회원가입 추가
   onGuest: () => void;
   onGoogle: () => void;
 }) => {
@@ -30,11 +32,12 @@ export const LoginPopup = ({
         <Text style={styles.title}>Log In</Text>
 
         <TextInput
-          placeholder="ID"
+          placeholder="Email"
           style={styles.input}
           value={loginId}
           onChangeText={setLoginId}
           placeholderTextColor="#999"
+          autoCapitalize="none"
         />
 
         <TextInput
@@ -46,14 +49,24 @@ export const LoginPopup = ({
           placeholderTextColor="#999"
         />
 
+        {/* 로그인 버튼 */}
         <TouchableOpacity style={styles.btn} onPress={onLogin}>
           <Text style={styles.btnText}>Log In</Text>
         </TouchableOpacity>
 
+        {/* ⭐ 회원가입 버튼 */}
+        <TouchableOpacity
+          style={[styles.btn, styles.register]}
+          onPress={onRegister}>
+          <Text style={styles.btnText}>Register</Text>
+        </TouchableOpacity>
+
+        {/* 게스트 */}
         <TouchableOpacity style={[styles.btn, styles.guest]} onPress={onGuest}>
           <Text style={styles.btnText}>Continue as Guest</Text>
         </TouchableOpacity>
 
+        {/* 구글 */}
         <TouchableOpacity
           style={[styles.btn, styles.google]}
           onPress={onGoogle}>
@@ -101,6 +114,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 6,
     marginTop: 10,
+  },
+  register: {
+    backgroundColor: '#28a745', // 초록색 (회원가입 느낌)
   },
   guest: {
     backgroundColor: '#555',

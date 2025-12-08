@@ -6,6 +6,7 @@ import {
   View,
   NativeModules,
   NativeEventEmitter,
+  Alert,
 } from 'react-native';
 
 import {useKeepAwake} from 'expo-keep-awake';
@@ -13,6 +14,7 @@ import DeviceInfo from 'react-native-device-info';
 
 import {useAuth} from './components/Auth/useAuth';
 import {LoginPopup} from './components/Auth/LoginPopup';
+import {RegisterPopup} from './components/Auth/RegisterPopup';
 
 import {
   WebGuideOverlay,
@@ -33,6 +35,7 @@ const App = () => {
     user,
     loading: authLoading,
     loginWithEmail,
+    registerWithEmail,
     loginWithGoogle,
     loginAsGuest,
     logout,
@@ -41,10 +44,20 @@ const App = () => {
   /** ⭐ 게임 클라이언트 초기화 여부 */
   const [initialized, setInitialized] = useState(false);
 
-  /** ⭐ 로그인 UI */
+  /** ⭐ 로그인 폼 상태 */
   const [showLoginPopup, setShowLoginPopup] = useState(false);
+
+  /** 로그인 상태 */
   const [loginId, setLoginId] = useState('');
   const [loginPw, setLoginPw] = useState('');
+
+  /** ⭐ 회원가입 모드 */
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+
+  /** 회원가입 입력 값 */
+  const [regEmail, setRegEmail] = useState('');
+  const [regPw, setRegPw] = useState('');
+  const [regPw2, setRegPw2] = useState('');
 
   /** ⭐ WebGuide */
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -80,7 +93,7 @@ const App = () => {
 
   /** ⭐ 인증 + 게임 초기화 → Godot 로그인 */
   useEffect(() => {
-    if (!initialized) return; // Godot 준비X
+    if (!initialized) return;
     if (!user?.uid) {
       setShowLoginPopup(true);
       return;
@@ -129,6 +142,23 @@ const App = () => {
     godot.sendInput(keyboardTarget, keyboardValue, false);
   }, [keyboardValue]);
 
+  /** ⭐ 회원가입 submit */
+  const handleRegisterSubmit = async () => {
+    if (regPw !== regPw2) {
+      Alert.alert('Password Mismatch', 'Passwords do not match.');
+      return;
+    }
+
+    const res = await registerWithEmail(regEmail, regPw);
+    if (res) {
+      // 회원가입 성공 → 로그인 화면으로
+      setIsRegisterMode(false);
+      setRegEmail('');
+      setRegPw('');
+      setRegPw2('');
+    }
+  };
+
   return (
     <View style={styles.full}>
       <RTNGodotView style={styles.full} />
@@ -139,18 +169,34 @@ const App = () => {
         guideUrl={guideUrl}
       />
 
-      {showLoginPopup && (
+      {/* ⭐ 팝업: 로그인 or 회원가입 */}
+      {showLoginPopup && !isRegisterMode && (
         <LoginPopup
           loginId={loginId}
           loginPw={loginPw}
           setLoginId={setLoginId}
           setLoginPw={setLoginPw}
           onLogin={() => loginWithEmail(loginId, loginPw)}
+          onRegister={() => setIsRegisterMode(true)}
           onGuest={loginAsGuest}
           onGoogle={loginWithGoogle}
         />
       )}
 
+      {showLoginPopup && isRegisterMode && (
+        <RegisterPopup
+          email={regEmail}
+          pw={regPw}
+          pwConfirm={regPw2}
+          setEmail={setRegEmail}
+          setPw={setRegPw}
+          setPwConfirm={setRegPw2}
+          onSubmit={handleRegisterSubmit}
+          onBack={() => setIsRegisterMode(false)}
+        />
+      )}
+
+      {/* ⭐ Hidden keyboard */}
       <HiddenKeyboardInput
         visible={showKeyboard}
         value={keyboardValue}
