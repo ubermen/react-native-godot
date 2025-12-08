@@ -1,5 +1,5 @@
 import 'setimmediate';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {RTNGodotView} from '@borndotcom/react-native-godot';
 import {
   StyleSheet,
@@ -11,11 +11,14 @@ import {
   NativeEventEmitter,
   ActivityIndicator,
 } from 'react-native';
-import {WebView} from 'react-native-webview';
 import {useKeepAwake} from 'expo-keep-awake';
 import DeviceInfo from 'react-native-device-info';
 import auth, {FirebaseAuthTypes} from '@react-native-firebase/auth';
 import {useGodotBridge} from './components/Godot/useGodotBridge';
+import {
+  WebGuideOverlay,
+  WebGuideOverlayRef,
+} from './components/Godot/WebGuideOverlay';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import googleServices from './android/app/google-services.json';
 
@@ -78,17 +81,13 @@ const App = () => {
   const openGuide = () => setIsGuideOpen(true);
   const closeGuide = () => setIsGuideOpen(false);
 
-  const [webviewKey, setWebviewKey] = useState(0);
-  const webviewRef = React.useRef<WebView>(null);
-
-  /** ⭐ WebViewBox 크기 계산용 상태 */
-  const [boxWidth, setBoxWidth] = useState(640);
-  const [boxHeight, setBoxHeight] = useState(360);
-
-  /** ⭐ 비율 정보 */
-  const TARGET_W = 640;
-  const TARGET_H = 360;
-  const RATIO = TARGET_W / TARGET_H; // 1.777...
+  const webGuideRef = useRef<WebGuideOverlayRef>(null);
+  const goBackGuide = () => {
+    webGuideRef.current?.goBack();
+  };
+  const goHomeGuide = () => {
+    webGuideRef.current?.goHome();
+  };
 
   // ⭐ 숨겨진 TextInput용 상태
   const [showKeyboard, setShowKeyboard] = useState(false);
@@ -96,19 +95,9 @@ const App = () => {
   const [keyboardTarget, setKeyboardTarget] = useState<string>('');
   const [keyboardMaxLength, setKeyboardMaxLength] = useState<number>(0);
 
-  const goBackGuide = () => {
-    if (webviewRef.current) {
-      webviewRef.current.goBack();
-    }
-  };
-
   // ⭐ 추가
   const [loginId, setLoginId] = useState('');
   const [loginPw, setLoginPw] = useState('');
-
-  const goHomeGuide = () => {
-    setWebviewKey(prev => prev + 1);
-  };
 
   const onLogOut = () => {
     setIsGuideOpen(false);
@@ -270,50 +259,15 @@ const App = () => {
     };
   }, []);
 
-  /** ⭐ WebViewOverlay 크기 기반 WebViewBox 실측 조정 */
-  const onOverlayLayout = (e: any) => {
-    const {width: screenW, height: screenH} = e.nativeEvent.layout;
-
-    // 가로모드 기준: 위아래 꽉 채움 → height = screenH
-    const newHeight = screenH;
-
-    // 비율에 따라 width 계산
-    let newWidth = newHeight * RATIO; // height * 1.777...
-
-    // 장치 width 보다 크면 clamp
-    if (newWidth > screenW) {
-      newWidth = screenW;
-    }
-
-    setBoxHeight(newHeight);
-    setBoxWidth(newWidth);
-  };
-
   return (
     <View style={styles.fullscreen}>
       <RTNGodotView style={styles.fullscreen} />
 
-      <View
-        onLayout={onOverlayLayout}
-        style={[
-          styles.webviewOverlay,
-          {display: isGuideOpen ? 'flex' : 'none'},
-        ]}
-        pointerEvents={isGuideOpen ? 'box-none' : 'none'}>
-        <View
-          style={[
-            styles.webviewBox,
-            {width: boxWidth * 0.85, height: boxHeight + 160, top: -80},
-          ]}
-          pointerEvents="auto">
-          <WebView
-            key={webviewKey}
-            ref={webviewRef}
-            source={{uri: guideUrl}}
-            style={{flex: 1}}
-          />
-        </View>
-      </View>
+      <WebGuideOverlay
+        ref={webGuideRef}
+        visible={isGuideOpen}
+        guideUrl={guideUrl}
+      />
 
       {showLoginPopup && (
         <View style={styles.loginPopup}>
@@ -450,24 +404,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     color: '#000',
   },
-
-  webviewOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    right: 0,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-
-  webviewBox: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-
   loadingOverlay: {
     position: 'absolute',
     top: 0,
