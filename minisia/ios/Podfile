@@ -30,7 +30,33 @@ target 'Minisia' do
   end
   
   config = use_native_modules!
-
+  
+  static_frameworks = [
+    'FirebaseAuthInterop',
+    'FirebaseAppCheckInterop',
+    'FirebaseCore',
+    'FirebaseCoreExtension',
+    'GoogleUtilities',
+    'RecaptchaInterop',
+    'FirebaseCoreInternal',
+    'FirebaseInstallations',
+    'GoogleDataTransport',
+    'nanopb',
+    'FirebaseABTesting',
+    'FirebaseAuth'
+  ]
+  
+  pre_install do |installer|
+    installer.pod_targets.each do |pod|
+      if static_frameworks.include?(pod.name)
+        puts "Configuring #{pod.name} as static framework"
+        def pod.build_type
+          Pod::BuildType.new(:linkage => :static, :packaging => :framework)
+        end
+      end
+    end
+  end
+  
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
@@ -45,5 +71,5 @@ target 'Minisia' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
-  end
+    end
 end
