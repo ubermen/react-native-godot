@@ -37,6 +37,7 @@ const App = () => {
     loginWithEmail,
     registerWithEmail,
     loginWithGoogle,
+    loginWithApple,
     loginAsGuest,
     logout,
   } = useAuth();
@@ -180,6 +181,7 @@ const App = () => {
           onRegister={() => setIsRegisterMode(true)}
           onGuest={loginAsGuest}
           onGoogle={loginWithGoogle}
+          onApple={loginWithApple}
         />
       )}
 

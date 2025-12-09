@@ -43,7 +43,8 @@ target 'Minisia' do
     'GoogleDataTransport',
     'nanopb',
     'FirebaseABTesting',
-    'FirebaseAuth'
+    'FirebaseAuth',
+    'RNAppleAuthentication'
   ]
   
   pre_install do |installer|

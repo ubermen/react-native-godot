@@ -2784,6 +2784,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@invertase/react-native-apple-authentication@npm:^2.5.0":
+  version: 2.5.0
+  resolution: "@invertase/react-native-apple-authentication@npm:2.5.0"
+  checksum: 10c0/b8732b13a3adb73b787c2ee493ef92fe00351a09289349d1d4a8cb830f66790210e499364756bbff09ced5d32e2c032d334b64d9b9dfb0ce8e3b85d84ea0ab86
+  languageName: node
+  linkType: hard
+
 "@isaacs/cliui@npm:^8.0.2":
   version: 8.0.2
   resolution: "@isaacs/cliui@npm:8.0.2"
@@ -4260,6 +4267,7 @@ __metadata:
     "@babel/preset-env": "npm:^7.25.3"
     "@babel/runtime": "npm:^7.25.0"
     "@borndotcom/react-native-godot": "npm:^1.0.1"
+    "@invertase/react-native-apple-authentication": "npm:^2.5.0"
     "@react-native-community/cli": "npm:^20.0.0"
     "@react-native-community/cli-platform-android": "npm:^20.0.0"
     "@react-native-community/cli-platform-ios": "npm:^20.0.0"

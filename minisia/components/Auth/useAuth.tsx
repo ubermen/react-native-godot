@@ -6,10 +6,15 @@ import auth, {
   signInAnonymously,
   signOut,
   GoogleAuthProvider,
+  AppleAuthProvider,
 } from '@react-native-firebase/auth';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import googleServices from '../../android/app/google-services.json';
 import {Platform, Alert} from 'react-native';
+import appleAuth, {
+  AppleRequestOperation,
+  AppleRequestScope,
+} from '@invertase/react-native-apple-authentication';
 
 /* ---------------------------
  * ANDROID: webClientId 찾기
@@ -19,7 +24,6 @@ const findAndroidWebClientId = () => {
     if (!client.oauth_client) continue;
 
     for (const oauth of client.oauth_client) {
-      // Android에서 Firebase Auth에 필요한 Web Client ID (client_type = 3)
       if (oauth.client_type === 3) return oauth.client_id;
     }
   }
@@ -43,8 +47,8 @@ export const useAuth = () => {
     const webClientId = findAndroidWebClientId();
 
     GoogleSignin.configure({
-      webClientId, // Android용
-      iosClientId: IOS_CLIENT_ID, // iOS용
+      webClientId, // android
+      iosClientId: IOS_CLIENT_ID, // ios
       offlineAccess: true,
     });
 
@@ -133,13 +137,12 @@ export const useAuth = () => {
       } else {
         Alert.alert('Login Failed', 'Could not sign in.');
       }
-
       return null;
     }
   };
 
   /* -----------------------------------
-   * 구글 로그인 (iOS + Android)
+   * 구글 로그인
    * ----------------------------------- */
   const loginWithGoogle = async () => {
     if (Platform.OS === 'android') {
@@ -155,6 +158,44 @@ export const useAuth = () => {
 
     const credential = GoogleAuthProvider.credential(idToken);
     return auth().signInWithCredential(credential);
+  };
+
+  /* -----------------------------------
+   * 🍎 애플 로그인
+   * ----------------------------------- */
+  const loginWithApple = async () => {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Apple Login', 'Available only on iOS.');
+      return null;
+    }
+
+    try {
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: appleAuth.Operation.LOGIN,
+        requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+      });
+
+      // identityToken 없으면 실패
+      if (!appleAuthRequestResponse.identityToken) {
+        Alert.alert('Apple Sign-In failed - no identity token returned');
+        return null;
+      }
+
+      const {identityToken, nonce} = appleAuthRequestResponse;
+
+      // Firebase credential 만들기
+      const appleCredential = auth.AppleAuthProvider.credential(
+        identityToken,
+        nonce,
+      );
+
+      // Firebase 로그인
+      return auth().signInWithCredential(appleCredential);
+    } catch (e) {
+      console.log('Apple login error:', e);
+      Alert.alert('Login Failed', 'Could not sign in with Apple.');
+      return null;
+    }
   };
 
   /* -----------------------------------
@@ -178,6 +219,7 @@ export const useAuth = () => {
     registerWithEmail,
     loginWithEmail,
     loginWithGoogle,
+    loginWithApple, // ⭐ 추가됨
     loginAsGuest,
     logout,
   };

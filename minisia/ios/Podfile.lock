@@ -2598,6 +2598,8 @@ PODS:
     - React-utils (= 0.81.4)
     - SocketRocket
   - RecaptchaInterop (101.0.0)
+  - RNAppleAuthentication (2.5.0):
+    - React-Core
   - RNDeviceInfo (15.0.1):
     - React-Core
   - RNFBApp (23.5.0):
@@ -2964,6 +2966,7 @@ DEPENDENCIES:
   - ReactAppDependencyProvider (from `build/generated/ios`)
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
+  - "RNAppleAuthentication (from `../node_modules/@invertase/react-native-apple-authentication`)"
   - RNDeviceInfo (from `../node_modules/react-native-device-info`)
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBAuth (from `../node_modules/@react-native-firebase/auth`)"
@@ -3161,6 +3164,8 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../node_modules/react-native/ReactCommon"
+  RNAppleAuthentication:
+    :path: "../node_modules/@invertase/react-native-apple-authentication"
   RNDeviceInfo:
     :path: "../node_modules/react-native-device-info"
   RNFBApp:
@@ -3277,6 +3282,7 @@ SPEC CHECKSUMS:
   ReactCodegen: 1d05923ad119796be9db37830d5e5dc76586aa00
   ReactCommon: 394c6b92765cf6d211c2c3f7f6bc601dffb316a6
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
+  RNAppleAuthentication: 9027af8aa92b4719ef1b6030a8e954d37079473a
   RNDeviceInfo: 36d7f232bfe7c9b5c494cb7793230424ed32c388
   RNFBApp: 255fa19a91d6c1309e021ee75d5d209754e5961b
   RNFBAuth: 7123a71a1fc8dec4aa4e6cb656562661b3ece9f7
@@ -3287,6 +3293,6 @@ SPEC CHECKSUMS:
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: a3ed390a19db0459bd6839823a6ac6d9c6db198d
 
-PODFILE CHECKSUM: 1d808b561d168d8d99a141c9b50ea67a0aaaa2f0
+PODFILE CHECKSUM: 51e4120d719e58def11994fd9af994d75b987808
 
 COCOAPODS: 1.15.2

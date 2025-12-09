@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@borndotcom/react-native-godot": "^1.0.1",
+    "@invertase/react-native-apple-authentication": "^2.5.0",
     "@react-native-firebase/app": "^23.5.0",
     "@react-native-firebase/auth": "^23.5.0",
     "@react-native-google-signin/google-signin": "^16.0.0",
